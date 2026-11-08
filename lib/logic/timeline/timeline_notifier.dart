@@ -653,6 +653,114 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
       );
     }
   }
+
+  bool extractAudioFromClip(String clipId) {
+    final clip = state.project.findClipById(clipId);
+    if (clip == null || clip.type != ClipType.video) return false;
+
+    _recordSnapshot();
+
+    // Mute original video clip
+    final mutedClip = clip.copyWith(volume: 0.0);
+    var updatedProject = state.project.withUpdatedClip(mutedClip);
+
+    // Create extracted audio clip
+    final extractedAudioId = 'audio-extracted-${DateTime.now().microsecondsSinceEpoch}';
+    final audioTrackIndex = updatedProject.tracks.indexWhere((t) => t.type == ClipType.audio);
+
+    final extractedClip = TimelineClip(
+      id: extractedAudioId,
+      trackId: audioTrackIndex != -1 ? updatedProject.tracks[audioTrackIndex].id : 'track-audio-bgm',
+      type: ClipType.audio,
+      name: 'Audio ${clip.name}',
+      sourcePath: clip.sourcePath,
+      timelineStart: clip.timelineStart,
+      duration: clip.duration,
+      sourceIn: clip.sourceIn,
+      sourceOut: clip.sourceOut,
+      speed: clip.speed,
+      volume: 1.0,
+    );
+
+    if (audioTrackIndex != -1) {
+      final track = updatedProject.tracks[audioTrackIndex];
+      final newClips = List<TimelineClip>.from(track.clips)..add(extractedClip);
+      final updatedTrack = track.copyWith(clips: newClips);
+      updatedProject = updatedProject.withUpdatedTrack(updatedTrack);
+    } else {
+      final newTrack = TimelineTrack(
+        id: 'track-audio-bgm',
+        type: ClipType.audio,
+        name: 'Audio BGM',
+        clips: [extractedClip],
+      );
+      final newTracks = List<TimelineTrack>.from(updatedProject.tracks)..add(newTrack);
+      updatedProject = updatedProject.copyWith(tracks: newTracks);
+    }
+
+    state = state.copyWith(
+      project: updatedProject,
+      selectedClipId: extractedClip.id,
+    );
+    return true;
+  }
+
+  bool replaceClipSource(
+    String clipId, {
+    required String newPath,
+    required String newName,
+    Duration? newDuration,
+  }) {
+    final clip = state.project.findClipById(clipId);
+    if (clip == null) return false;
+
+    _recordSnapshot();
+
+    final updated = clip.copyWith(
+      sourcePath: newPath,
+      name: newName,
+      duration: newDuration ?? clip.duration,
+      sourceOut: newDuration ?? clip.sourceOut,
+    );
+
+    final updatedProject = state.project.withUpdatedClip(updated);
+    state = state.copyWith(project: updatedProject);
+    return true;
+  }
+
+  bool toggleClipReverse(String clipId) {
+    final clip = state.project.findClipById(clipId);
+    if (clip == null) return false;
+
+    _recordSnapshot();
+    final updated = clip.copyWith(isReversed: !clip.isReversed);
+    final updatedProject = state.project.withUpdatedClip(updated);
+    state = state.copyWith(project: updatedProject);
+    return true;
+  }
+
+  void updateCanvasBackground({int? color, bool clearColor = false, double? blur}) {
+    _recordSnapshot();
+    state = state.copyWith(
+      project: state.project.copyWith(
+        canvasColor: color,
+        clearCanvasColor: clearColor,
+        canvasBlur: blur,
+      ),
+    );
+  }
+
+  bool selectClipAtPlayhead() {
+    final mainTrack = state.project.mainVideoTrack;
+    if (mainTrack == null || mainTrack.clips.isEmpty) return false;
+
+    final clipAtPlayhead = mainTrack.clips.where(
+      (c) => state.currentPosition >= c.timelineStart && state.currentPosition <= c.timelineEnd,
+    ).firstOrNull ?? mainTrack.clips.first;
+
+    selectClip(clipAtPlayhead.id);
+    return true;
+  }
 }
 
 final timelineNotifierProvider =

@@ -11,6 +11,8 @@ class TimelineProject {
   final String resolution; // '720P', '1080P', '2K/4K'
   final List<TimelineTrack> tracks;
   final DateTime updatedAt;
+  final int? canvasColor;
+  final double canvasBlur;
 
   const TimelineProject({
     required this.id,
@@ -20,6 +22,8 @@ class TimelineProject {
     this.resolution = '1080P',
     required this.tracks,
     required this.updatedAt,
+    this.canvasColor,
+    this.canvasBlur = 0.0,
   });
 
   Duration get totalDuration {
@@ -56,6 +60,9 @@ class TimelineProject {
     String? resolution,
     List<TimelineTrack>? tracks,
     DateTime? updatedAt,
+    int? canvasColor,
+    bool clearCanvasColor = false,
+    double? canvasBlur,
   }) {
     return TimelineProject(
       id: id ?? this.id,
@@ -65,11 +72,23 @@ class TimelineProject {
       resolution: resolution ?? this.resolution,
       tracks: tracks ?? this.tracks,
       updatedAt: updatedAt ?? this.updatedAt,
+      canvasColor: clearCanvasColor ? null : (canvasColor ?? this.canvasColor),
+      canvasBlur: canvasBlur ?? this.canvasBlur,
     );
   }
 
   TimelineProject withUpdatedTrack(TimelineTrack updatedTrack) {
     final newTracks = tracks.map((t) => t.id == updatedTrack.id ? updatedTrack : t).toList();
+    return copyWith(tracks: newTracks, updatedAt: DateTime.now());
+  }
+
+  TimelineProject withUpdatedClip(TimelineClip updatedClip) {
+    final newTracks = tracks.map((t) {
+      if (t.id == updatedClip.trackId) {
+        return t.withUpdatedClip(updatedClip);
+      }
+      return t;
+    }).toList();
     return copyWith(tracks: newTracks, updatedAt: DateTime.now());
   }
 

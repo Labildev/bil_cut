@@ -33,6 +33,9 @@ class TimelineClip {
 
   /// Rotation in degrees (0, 90, 180, 270)
   final int rotationDegrees;
+
+  /// Reverse playback flag
+  final bool isReversed;
   
   /// Visual effects, transitions & animations
   final ClipTransition? transition;
@@ -69,6 +72,7 @@ class TimelineClip {
     this.speed = 1.0,
     this.volume = 1.0,
     this.rotationDegrees = 0,
+    this.isReversed = false,
     this.transition,
     this.adjustments = const ColorAdjustments(),
     this.animation,
@@ -101,6 +105,7 @@ class TimelineClip {
     double? speed,
     double? volume,
     int? rotationDegrees,
+    bool? isReversed,
     ClipTransition? transition,
     bool clearTransition = false,
     ColorAdjustments? adjustments,
@@ -131,6 +136,7 @@ class TimelineClip {
       speed: speed ?? this.speed,
       volume: volume ?? this.volume,
       rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+      isReversed: isReversed ?? this.isReversed,
       transition: clearTransition ? null : (transition ?? this.transition),
       adjustments: adjustments ?? this.adjustments,
       animation: animation ?? this.animation,
