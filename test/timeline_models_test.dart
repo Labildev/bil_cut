@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bil_cut/data/models/timeline_clip.dart';
-import 'package:bil_cut/data/models/timeline_track.dart';
 import 'package:bil_cut/data/models/timeline_project.dart';
 
 void main() {
@@ -36,10 +35,10 @@ void main() {
         trackId: 'track-1',
         type: ClipType.video,
         name: 'Video 1',
-        timelineStart: const Duration(seconds: 2),
-        duration: const Duration(seconds: 8),
+        timelineStart: Duration(seconds: 2),
+        duration: Duration(seconds: 8),
         sourceIn: Duration.zero,
-        sourceOut: const Duration(seconds: 8),
+        sourceOut: Duration(seconds: 8),
       );
 
       final trimmedStart = clip.trimStart(const Duration(seconds: 4));

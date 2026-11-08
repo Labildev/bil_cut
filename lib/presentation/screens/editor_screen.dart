@@ -1,60 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/project_draft.dart';
+import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
 import '../widgets/editor/player_viewport.dart';
-import '../widgets/editor/timeline_shell.dart';
+import '../widgets/timeline/interactive_timeline.dart';
 
-class EditorScreen extends StatefulWidget {
+class EditorScreen extends ConsumerStatefulWidget {
   final ProjectDraft? initialDraft;
 
   const EditorScreen({super.key, this.initialDraft});
 
   @override
-  State<EditorScreen> createState() => _EditorScreenState();
+  ConsumerState<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorScreenState extends State<EditorScreen> {
-  late String _resolution;
-  late String _aspectRatio;
-  bool _isPlaying = false;
-  bool _isClipSelected = false;
-  Duration _currentPosition = const Duration(seconds: 4, milliseconds: 200);
-  Duration _totalDuration = const Duration(seconds: 15);
-
+class _EditorScreenState extends ConsumerState<EditorScreen> {
   @override
   void initState() {
     super.initState();
-    _resolution = '1080P';
-    _aspectRatio = widget.initialDraft?.aspectRatio ?? '9:16';
     if (widget.initialDraft != null) {
-      _totalDuration = widget.initialDraft!.duration;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(timelineNotifierProvider.notifier).updateAspectRatio(
+              widget.initialDraft!.aspectRatio,
+            );
+      });
     }
-  }
-
-  void _handlePlayPauseToggle() {
-    setState(() {
-      _isPlaying = !_isPlaying;
-    });
-  }
-
-  void _handleSeek(Duration newPosition) {
-    setState(() {
-      _currentPosition = newPosition;
-    });
-  }
-
-  void _handleAspectRatioToggle() {
-    setState(() {
-      if (_aspectRatio == '9:16') {
-        _aspectRatio = '16:9';
-      } else if (_aspectRatio == '16:9') {
-        _aspectRatio = '1:1';
-      } else {
-        _aspectRatio = '9:16';
-      }
-    });
   }
 
   void _handleFullscreenToggle() {
@@ -67,33 +40,58 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _handleToolSelected(EditorToolType type) {
+    final notifier = ref.read(timelineNotifierProvider.notifier);
+
     switch (type) {
       case EditorToolType.edit:
-        setState(() {
-          _isClipSelected = !_isClipSelected;
-        });
+        // Toggle selection on first video clip if none is selected
+        final currentSelection = ref.read(timelineNotifierProvider).selectedClipId;
+        if (currentSelection == null) {
+          final mainTrack = ref.read(timelineNotifierProvider).project.mainVideoTrack;
+          if (mainTrack != null && mainTrack.clips.isNotEmpty) {
+            notifier.selectClip(mainTrack.clips.first.id);
+          }
+        } else {
+          notifier.deselectClip();
+        }
         break;
       case EditorToolType.split:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Klip dibagi pada posisi playhead'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        final success = notifier.splitSelectedClip();
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Klip dibagi pada posisi playhead'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu di timeline'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
         break;
       case EditorToolType.delete:
-        setState(() {
-          _isClipSelected = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Klip dihapus'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        final success = notifier.deleteSelectedClip();
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Klip dihapus dari timeline'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
         break;
       case EditorToolType.format:
-        _handleAspectRatioToggle();
+        final currentRatio = ref.read(timelineNotifierProvider).project.aspectRatio;
+        final nextRatio = currentRatio == '9:16'
+            ? '16:9'
+            : currentRatio == '16:9'
+                ? '1:1'
+                : '9:16';
+        notifier.updateAspectRatio(nextRatio);
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,6 +104,8 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _handleExport() {
+    final state = ref.read(timelineNotifierProvider);
+
     showDialog(
       context: context,
       builder: (context) {
@@ -129,14 +129,15 @@ class _EditorScreenState extends State<EditorScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'Video akan diekspor dengan pengaturan:',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 12),
-              _buildExportInfoRow('Resolusi:', _resolution),
-              _buildExportInfoRow('Rasio:', _aspectRatio),
-              _buildExportInfoRow('Durasi:', '${_totalDuration.inSeconds} detik'),
+              _buildExportInfoRow('Resolusi:', state.project.resolution),
+              _buildExportInfoRow('Rasio:', state.project.aspectRatio),
+              _buildExportInfoRow('Durasi:', '${state.totalDuration.inSeconds} detik'),
+              _buildExportInfoRow('FPS:', '${state.project.fps} fps'),
             ],
           ),
           actions: [
@@ -177,6 +178,10 @@ class _EditorScreenState extends State<EditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(timelineNotifierProvider);
+    final notifier = ref.read(timelineNotifierProvider.notifier);
+    final isClipSelected = state.selectedClipId != null;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -189,12 +194,8 @@ class _EditorScreenState extends State<EditorScreen> {
               onRedo: () {},
               canUndo: true,
               canRedo: false,
-              resolution: _resolution,
-              onResolutionChanged: (res) {
-                setState(() {
-                  _resolution = res;
-                });
-              },
+              resolution: state.project.resolution,
+              onResolutionChanged: (res) => notifier.updateResolution(res),
               onExport: _handleExport,
             ),
 
@@ -202,26 +203,27 @@ class _EditorScreenState extends State<EditorScreen> {
             Expanded(
               flex: 4,
               child: PlayerViewport(
-                aspectRatio: _aspectRatio,
-                currentPosition: _currentPosition,
-                totalDuration: _totalDuration,
-                isPlaying: _isPlaying,
-                onPlayPauseToggle: _handlePlayPauseToggle,
+                aspectRatio: state.project.aspectRatio,
+                currentPosition: state.currentPosition,
+                totalDuration: state.totalDuration,
+                isPlaying: state.isPlaying,
+                onPlayPauseToggle: () => notifier.togglePlayPause(),
                 onFullscreenToggle: _handleFullscreenToggle,
-                onAspectRatioToggle: _handleAspectRatioToggle,
+                onAspectRatioToggle: () {
+                  final nextRatio = state.project.aspectRatio == '9:16'
+                      ? '16:9'
+                      : state.project.aspectRatio == '16:9'
+                          ? '1:1'
+                          : '9:16';
+                  notifier.updateAspectRatio(nextRatio);
+                },
               ),
             ),
 
-            // 3. Timeline Shell (Ruler, Playhead, Tracks)
+            // 3. Interactive Timeline Engine (Custom Ruler, Scrubbing, Pinch-Zoom, Tracks, Clips)
             Expanded(
               flex: 5,
-              child: TimelineShell(
-                currentPosition: _currentPosition,
-                totalDuration: _totalDuration,
-                isPlaying: _isPlaying,
-                onPlayPauseToggle: _handlePlayPauseToggle,
-                onSplit: () => _handleToolSelected(EditorToolType.split),
-                onSeek: _handleSeek,
+              child: InteractiveTimeline(
                 onAddMedia: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -232,9 +234,9 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
             ),
 
-            // 4. Bottom Toolbar (CapCut Action Tools)
+            // 4. Bottom Toolbar (Transforms based on clip selection)
             BottomToolbar(
-              isClipSelected: _isClipSelected,
+              isClipSelected: isClipSelected,
               onToolSelected: _handleToolSelected,
             ),
           ],
