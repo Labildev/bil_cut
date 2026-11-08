@@ -62,3 +62,4 @@ class TimelineTrack {
     return copyWith(clips: newClips);
   }
 }
+

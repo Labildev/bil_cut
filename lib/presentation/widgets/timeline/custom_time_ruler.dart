@@ -138,3 +138,4 @@ class _TimeRulerPainter extends CustomPainter {
         oldDelegate.totalDuration != totalDuration;
   }
 }
+

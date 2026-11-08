@@ -193,3 +193,4 @@ final timelineNotifierProvider =
     StateNotifierProvider.autoDispose<TimelineNotifier, TimelineState>((ref) {
   return TimelineNotifier();
 });
+
