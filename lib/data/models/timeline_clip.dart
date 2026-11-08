@@ -31,8 +31,21 @@ class TimelineClip {
   /// Rotation in degrees (0, 90, 180, 270)
   final int rotationDegrees;
   
-  /// Visual properties (for text or overlay)
+  /// Text specific styling properties
   final String? textContent;
+  final String fontFamily;
+  final int textColorValue;
+  final double fontSize;
+  final int? textBackgroundColorValue;
+  final bool hasTextShadow;
+  final bool hasTextOutline;
+
+  /// Overlay / PIP specific transform properties (-1.0 to 1.0 relative coordinates)
+  final double positionX;
+  final double positionY;
+  final double scale;
+  final double opacity;
+
   final Map<String, dynamic>? extraProperties;
 
   const TimelineClip({
@@ -49,6 +62,16 @@ class TimelineClip {
     this.volume = 1.0,
     this.rotationDegrees = 0,
     this.textContent,
+    this.fontFamily = 'Inter',
+    this.textColorValue = 0xFFFFFFFF,
+    this.fontSize = 22.0,
+    this.textBackgroundColorValue,
+    this.hasTextShadow = true,
+    this.hasTextOutline = false,
+    this.positionX = 0.0,
+    this.positionY = 0.0,
+    this.scale = 1.0,
+    this.opacity = 1.0,
     this.extraProperties,
   });
 
@@ -68,6 +91,16 @@ class TimelineClip {
     double? volume,
     int? rotationDegrees,
     String? textContent,
+    String? fontFamily,
+    int? textColorValue,
+    double? fontSize,
+    int? textBackgroundColorValue,
+    bool? hasTextShadow,
+    bool? hasTextOutline,
+    double? positionX,
+    double? positionY,
+    double? scale,
+    double? opacity,
     Map<String, dynamic>? extraProperties,
   }) {
     return TimelineClip(
@@ -84,6 +117,16 @@ class TimelineClip {
       volume: volume ?? this.volume,
       rotationDegrees: rotationDegrees ?? this.rotationDegrees,
       textContent: textContent ?? this.textContent,
+      fontFamily: fontFamily ?? this.fontFamily,
+      textColorValue: textColorValue ?? this.textColorValue,
+      fontSize: fontSize ?? this.fontSize,
+      textBackgroundColorValue: textBackgroundColorValue ?? this.textBackgroundColorValue,
+      hasTextShadow: hasTextShadow ?? this.hasTextShadow,
+      hasTextOutline: hasTextOutline ?? this.hasTextOutline,
+      positionX: positionX ?? this.positionX,
+      positionY: positionY ?? this.positionY,
+      scale: scale ?? this.scale,
+      opacity: opacity ?? this.opacity,
       extraProperties: extraProperties ?? this.extraProperties,
     );
   }
