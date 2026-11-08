@@ -178,6 +178,40 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
     );
   }
 
+  void loadProject(TimelineProject project) {
+    state = state.copyWith(
+      project: project,
+      currentPosition: Duration.zero,
+      isPlaying: false,
+      clearSelectedClip: true,
+    );
+  }
+
+  void appendClipsToMainTrack(List<TimelineClip> newClips) {
+    if (newClips.isEmpty) return;
+
+    final mainTrack = state.project.mainVideoTrack;
+    if (mainTrack == null) return;
+
+    var currentEnd = mainTrack.trackDuration;
+    final positionedClips = <TimelineClip>[];
+
+    for (final clip in newClips) {
+      final positioned = clip.copyWith(
+        trackId: mainTrack.id,
+        timelineStart: currentEnd,
+      );
+      positionedClips.add(positioned);
+      currentEnd += positioned.duration;
+    }
+
+    final updatedClips = List<TimelineClip>.from(mainTrack.clips)..addAll(positionedClips);
+    final updatedTrack = mainTrack.copyWith(clips: updatedClips);
+    final updatedProject = state.project.withUpdatedTrack(updatedTrack);
+
+    state = state.copyWith(project: updatedProject);
+  }
+
   void toggleTrackMute(String trackId) {
     final track = state.project.tracks.where((t) => t.id == trackId).firstOrNull;
     if (track != null) {
