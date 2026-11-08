@@ -273,3 +273,4 @@ class _CanvasBackgroundSheetState extends State<CanvasBackgroundSheet> {
     );
   }
 }
+
