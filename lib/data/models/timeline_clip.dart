@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'clip_animation.dart';
+import 'clip_transition.dart';
+import 'color_adjustments.dart';
 
 enum ClipType { video, audio, text, overlay }
 
@@ -31,6 +34,11 @@ class TimelineClip {
   /// Rotation in degrees (0, 90, 180, 270)
   final int rotationDegrees;
   
+  /// Visual effects, transitions & animations
+  final ClipTransition? transition;
+  final ColorAdjustments adjustments;
+  final ClipAnimation? animation;
+
   /// Text specific styling properties
   final String? textContent;
   final String fontFamily;
@@ -61,6 +69,9 @@ class TimelineClip {
     this.speed = 1.0,
     this.volume = 1.0,
     this.rotationDegrees = 0,
+    this.transition,
+    this.adjustments = const ColorAdjustments(),
+    this.animation,
     this.textContent,
     this.fontFamily = 'Inter',
     this.textColorValue = 0xFFFFFFFF,
@@ -90,6 +101,10 @@ class TimelineClip {
     double? speed,
     double? volume,
     int? rotationDegrees,
+    ClipTransition? transition,
+    bool clearTransition = false,
+    ColorAdjustments? adjustments,
+    ClipAnimation? animation,
     String? textContent,
     String? fontFamily,
     int? textColorValue,
@@ -116,6 +131,9 @@ class TimelineClip {
       speed: speed ?? this.speed,
       volume: volume ?? this.volume,
       rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+      transition: clearTransition ? null : (transition ?? this.transition),
+      adjustments: adjustments ?? this.adjustments,
+      animation: animation ?? this.animation,
       textContent: textContent ?? this.textContent,
       fontFamily: fontFamily ?? this.fontFamily,
       textColorValue: textColorValue ?? this.textColorValue,
@@ -137,7 +155,6 @@ class TimelineClip {
   }
 
   /// Splits this clip into two clips at [splitPointOnTimeline].
-  /// Returns a pair of (leftClip, rightClip) or null if split point is outside bounds.
   (TimelineClip, TimelineClip)? splitAt(Duration splitPointOnTimeline) {
     if (splitPointOnTimeline <= timelineStart || splitPointOnTimeline >= timelineEnd) {
       return null;
