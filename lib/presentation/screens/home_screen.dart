@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/media_picker_service.dart';
 import '../../data/models/project_draft.dart';
 import 'editor_screen.dart';
 
@@ -13,6 +14,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _mediaPicker = MediaPickerService();
+
   // Sample initial drafts for presentation
   final List<ProjectDraft> _drafts = [
     ProjectDraft(
@@ -47,6 +50,26 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => EditorScreen(initialDraft: draft),
       ),
     );
+  }
+
+  Future<void> _handleNewProject() async {
+    final files = await _mediaPicker.pickMultipleVideos();
+    if (!mounted) return;
+
+    if (files.isNotEmpty) {
+      final project = _mediaPicker.createProjectFromFiles(
+        files: files,
+        title: 'Proyek ${files.first.name}',
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => EditorScreen(initialProject: project),
+        ),
+      );
+    } else {
+      // Open editor directly
+      _openEditor();
+    }
   }
 
   void _deleteDraft(String id) {
@@ -224,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNewProjectHero() {
     return GestureDetector(
-      onTap: () => _openEditor(),
+      onTap: _handleNewProject,
       child: Container(
         height: 120,
         decoration: BoxDecoration(
