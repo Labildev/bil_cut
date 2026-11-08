@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/media_picker_service.dart';
@@ -13,12 +14,14 @@ import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
 import '../widgets/editor/modals/animation_selector_sheet.dart';
+import '../widgets/editor/modals/canvas_background_sheet.dart';
 import '../widgets/editor/modals/export_settings_sheet.dart';
 import '../widgets/editor/modals/filter_adjustment_sheet.dart';
 import '../widgets/editor/modals/format_selector_sheet.dart';
 import '../widgets/editor/modals/speed_control_sheet.dart';
 import '../widgets/editor/modals/text_editor_sheet.dart';
 import '../widgets/editor/modals/transition_selector_sheet.dart';
+import '../widgets/editor/modals/voiceover_recorder_sheet.dart';
 import '../widgets/editor/modals/volume_control_sheet.dart';
 import '../widgets/editor/player_viewport.dart';
 import '../widgets/timeline/interactive_timeline.dart';
@@ -225,10 +228,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> with WidgetsBinding
       case EditorToolType.edit:
         final currentSelection = ref.read(timelineNotifierProvider).selectedClipId;
         if (currentSelection == null) {
-          final mainTrack = ref.read(timelineNotifierProvider).project.mainVideoTrack;
-          if (mainTrack != null && mainTrack.clips.isNotEmpty) {
-            notifier.selectClip(mainTrack.clips.first.id);
-          }
+          notifier.selectClipAtPlayhead();
         } else {
           notifier.deselectClip();
         }
@@ -354,7 +354,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> with WidgetsBinding
         );
         break;
       case EditorToolType.audio:
-        _handlePickAudio(notifier);
+        _showAudioPickerOptions(notifier);
         break;
       case EditorToolType.overlay:
         _handlePickOverlay(notifier);
@@ -366,6 +366,72 @@ class _EditorScreenState extends ConsumerState<EditorScreen> with WidgetsBinding
           currentRatio: currentRatio,
           onRatioSelected: (newRatio) => notifier.updateAspectRatio(newRatio),
         );
+        break;
+      case EditorToolType.canvas:
+        final currentProject = ref.read(timelineNotifierProvider).project;
+        CanvasBackgroundSheet.show(
+          context: context,
+          initialColor: currentProject.canvasColor,
+          initialBlur: currentProject.canvasBlur,
+          onColorChanged: (c) => notifier.updateCanvasBackground(color: c, clearColor: c == null),
+          onBlurChanged: (b) => notifier.updateCanvasBackground(blur: b),
+        );
+        break;
+      case EditorToolType.extractAudio:
+        final clip = ref.read(timelineNotifierProvider).selectedClip;
+        if (clip != null && clip.type == ClipType.video) {
+          final success = notifier.extractAudioFromClip(clip.id);
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Audio berhasil diekstrak ke track audio BGM'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip video terlebih dahulu untuk mengekstrak audio'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.replace:
+        final clip = ref.read(timelineNotifierProvider).selectedClip;
+        if (clip != null) {
+          _handleReplaceClip(clip, notifier);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu untuk diganti'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.reverse:
+        final clip = ref.read(timelineNotifierProvider).selectedClip;
+        if (clip != null) {
+          notifier.toggleClipReverse(clip.id);
+          final isNowRev = !clip.isReversed;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isNowRev ? 'Pemutaran klip dibalik (Reverse ON)' : 'Pemutaran klip normal (Reverse OFF)',
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu untuk membalik pemutaran'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
         break;
       case EditorToolType.filters:
       case EditorToolType.adjust:
@@ -422,14 +488,112 @@ class _EditorScreenState extends ConsumerState<EditorScreen> with WidgetsBinding
           );
         }
         break;
-      default:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Menu ${type.name} dipilih'),
-            duration: const Duration(milliseconds: 800),
+    }
+  }
+
+  Future<void> _handleReplaceClip(TimelineClip clip, TimelineNotifier notifier) async {
+    final file = await _mediaPicker.pickVideo();
+    if (!mounted || file == null) return;
+
+    notifier.replaceClipSource(
+      clip.id,
+      newPath: file.path,
+      newName: file.name,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Klip diganti dengan "${file.name}"'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _showAudioPickerOptions(TimelineNotifier notifier) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(LucideIcons.music, color: AppColors.primary, size: 20),
+                  ),
+                  title: const Text(
+                    'Pilih Musik / Audio Galeri',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  subtitle: const Text(
+                    'Impor berkas audio atau musik latar',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handlePickAudio(notifier);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(LucideIcons.mic, color: Color(0xFF30D158), size: 20),
+                  ),
+                  title: const Text(
+                    'Rekam Suara (Voiceover)',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  subtitle: const Text(
+                    'Rekam narasi suara langsung ke posisi kursor playhead',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleVoiceover(notifier);
+                  },
+                ),
+              ],
+            ),
           ),
         );
-    }
+      },
+    );
+  }
+
+  void _handleVoiceover(TimelineNotifier notifier) {
+    final currentPos = ref.read(timelineNotifierProvider).currentPosition;
+    VoiceoverRecorderSheet.show(
+      context: context,
+      startPosition: currentPos,
+      onSaveVoiceover: (title, duration) {
+        notifier.addAudioClip(
+          name: title,
+          path: '/mock/voiceover/$title',
+          duration: duration,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Voiceover "$title" berhasil ditambahkan'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handleBackNavigation() async {
@@ -597,6 +761,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> with WidgetsBinding
                     activeAdjustments: activeMainClip?.adjustments,
                     activeTextClips: textClips,
                     activeOverlayClips: overlayClips,
+                    canvasColor: state.project.canvasColor,
+                    canvasBlur: state.project.canvasBlur,
                     onPlayPauseToggle: () => notifier.togglePlayPause(),
                     onFullscreenToggle: _handleFullscreenToggle,
                     onAspectRatioToggle: () {
