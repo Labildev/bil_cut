@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/media_picker_service.dart';
 import '../../data/models/project_draft.dart';
+import '../../data/models/timeline_project.dart';
+import '../../logic/player/video_playback_manager.dart';
 import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
@@ -10,24 +15,102 @@ import '../widgets/timeline/interactive_timeline.dart';
 
 class EditorScreen extends ConsumerStatefulWidget {
   final ProjectDraft? initialDraft;
+  final TimelineProject? initialProject;
 
-  const EditorScreen({super.key, this.initialDraft});
+  const EditorScreen({
+    super.key,
+    this.initialDraft,
+    this.initialProject,
+  });
 
   @override
   ConsumerState<EditorScreen> createState() => _EditorScreenState();
 }
 
 class _EditorScreenState extends ConsumerState<EditorScreen> {
+  late final VideoPlaybackManager _playbackManager;
+  late final MediaPickerService _mediaPicker;
+  Timer? _playbackTimer;
+
   @override
   void initState() {
     super.initState();
-    if (widget.initialDraft != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    _playbackManager = VideoPlaybackManager();
+    _mediaPicker = MediaPickerService();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialProject != null) {
+        ref.read(timelineNotifierProvider.notifier).loadProject(widget.initialProject!);
+      } else if (widget.initialDraft != null) {
         ref.read(timelineNotifierProvider.notifier).updateAspectRatio(
               widget.initialDraft!.aspectRatio,
             );
-      });
-    }
+      }
+
+      // Initial sync with player
+      final state = ref.read(timelineNotifierProvider);
+      _playbackManager.syncWithTimeline(
+        timelinePosition: state.currentPosition,
+        project: state.project,
+        isPlaying: state.isPlaying,
+      );
+    });
+
+    _startPlaybackTimer();
+  }
+
+  @override
+  void dispose() {
+    _playbackTimer?.cancel();
+    _playbackManager.dispose();
+    super.dispose();
+  }
+
+  void _startPlaybackTimer() {
+    const tickInterval = Duration(milliseconds: 33); // ~30 FPS
+    _playbackTimer = Timer.periodic(tickInterval, (_) {
+      final state = ref.read(timelineNotifierProvider);
+      if (state.isPlaying && !state.isScrubbing) {
+        final nextPosition = state.currentPosition + tickInterval;
+        if (nextPosition >= state.totalDuration) {
+          ref.read(timelineNotifierProvider.notifier).pause();
+          ref.read(timelineNotifierProvider.notifier).seekTo(Duration.zero);
+        } else {
+          ref.read(timelineNotifierProvider.notifier).seekTo(nextPosition);
+        }
+      }
+    });
+  }
+
+  void _syncPlayerWithState() {
+    final state = ref.read(timelineNotifierProvider);
+    _playbackManager.syncWithTimeline(
+      timelinePosition: state.currentPosition,
+      project: state.project,
+      isPlaying: state.isPlaying,
+    );
+  }
+
+  Future<void> _handleAddMedia() async {
+    final files = await _mediaPicker.pickMultipleVideos();
+    if (!mounted || files.isEmpty) return;
+
+    final newClips = files.map((file) {
+      return _mediaPicker.createClipFromXFile(
+        file: file,
+        trackId: 'track-main-video',
+        timelineStart: Duration.zero,
+      );
+    }).toList();
+
+    ref.read(timelineNotifierProvider.notifier).appendClipsToMainTrack(newClips);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${newClips.length} klip video ditambahkan ke track'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _handleFullscreenToggle() {
@@ -44,7 +127,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
     switch (type) {
       case EditorToolType.edit:
-        // Toggle selection on first video clip if none is selected
         final currentSelection = ref.read(timelineNotifierProvider).selectedClipId;
         if (currentSelection == null) {
           final mainTrack = ref.read(timelineNotifierProvider).project.mainVideoTrack;
@@ -182,6 +264,18 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final notifier = ref.read(timelineNotifierProvider.notifier);
     final isClipSelected = state.selectedClipId != null;
 
+    // Listen to changes to sync the video player engine
+    ref.listen(
+      timelineNotifierProvider,
+      (prev, next) {
+        if (prev?.currentPosition != next.currentPosition ||
+            prev?.isPlaying != next.isPlaying ||
+            prev?.project != next.project) {
+          _syncPlayerWithState();
+        }
+      },
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -199,23 +293,29 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               onExport: _handleExport,
             ),
 
-            // 2. Video Player Preview Viewport (Flexible / Aspect Ratio)
+            // 2. Video Player Preview Viewport (Live Video Player)
             Expanded(
               flex: 4,
-              child: PlayerViewport(
-                aspectRatio: state.project.aspectRatio,
-                currentPosition: state.currentPosition,
-                totalDuration: state.totalDuration,
-                isPlaying: state.isPlaying,
-                onPlayPauseToggle: () => notifier.togglePlayPause(),
-                onFullscreenToggle: _handleFullscreenToggle,
-                onAspectRatioToggle: () {
-                  final nextRatio = state.project.aspectRatio == '9:16'
-                      ? '16:9'
-                      : state.project.aspectRatio == '16:9'
-                          ? '1:1'
-                          : '9:16';
-                  notifier.updateAspectRatio(nextRatio);
+              child: ValueListenableBuilder<VideoPlayerController?>(
+                valueListenable: _playbackManager.controllerNotifier,
+                builder: (context, controller, child) {
+                  return PlayerViewport(
+                    aspectRatio: state.project.aspectRatio,
+                    currentPosition: state.currentPosition,
+                    totalDuration: state.totalDuration,
+                    isPlaying: state.isPlaying,
+                    videoController: controller,
+                    onPlayPauseToggle: () => notifier.togglePlayPause(),
+                    onFullscreenToggle: _handleFullscreenToggle,
+                    onAspectRatioToggle: () {
+                      final nextRatio = state.project.aspectRatio == '9:16'
+                          ? '16:9'
+                          : state.project.aspectRatio == '16:9'
+                              ? '1:1'
+                              : '9:16';
+                      notifier.updateAspectRatio(nextRatio);
+                    },
+                  );
                 },
               ),
             ),
@@ -224,13 +324,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             Expanded(
               flex: 5,
               child: InteractiveTimeline(
-                onAddMedia: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Buka Media Picker (Fase 3 Media Import)'),
-                    ),
-                  );
-                },
+                onAddMedia: _handleAddMedia,
               ),
             ),
 
