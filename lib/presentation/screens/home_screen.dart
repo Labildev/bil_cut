@@ -118,21 +118,30 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.accentBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset(
+                'assets/icons/app_icon.png',
+                width: 28,
+                height: 28,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, AppColors.accentBlue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    LucideIcons.scissors,
+                    size: 16,
+                    color: Colors.black,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(
-                LucideIcons.scissors,
-                size: 16,
-                color: Colors.black,
               ),
             ),
             const SizedBox(width: 10),
@@ -478,21 +487,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primary, AppColors.accentBlue],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.asset(
+                        'assets/icons/app_icon.png',
+                        width: 42,
+                        height: 42,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.primary, AppColors.accentBlue],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            LucideIcons.scissors,
+                            size: 20,
+                            color: Colors.black,
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        LucideIcons.scissors,
-                        size: 20,
-                        color: Colors.black,
                       ),
                     ),
                     const SizedBox(width: 12),
