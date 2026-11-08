@@ -1,4 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/models/clip_animation.dart';
+import '../../data/models/clip_transition.dart';
+import '../../data/models/color_adjustments.dart';
 import '../../data/models/timeline_clip.dart';
 import '../../data/models/timeline_project.dart';
 import '../../data/models/timeline_track.dart';
@@ -345,6 +348,68 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
     for (int i = 0; i < clips.length; i++) {
       clips[i] = clips[i].copyWith(timelineStart: cursor);
       cursor += clips[i].duration;
+    }
+  }
+
+  void setClipTransition(String clipId, ClipTransition? transition, {bool applyToAll = false}) {
+    _recordSnapshot();
+
+    if (applyToAll) {
+      for (final track in state.project.tracks) {
+        if (track.isMainTrack) {
+          final newClips = track.clips.map((c) => c.copyWith(
+            transition: transition,
+            clearTransition: transition == null,
+          )).toList();
+          final updatedTrack = track.copyWith(clips: newClips);
+          state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+          return;
+        }
+      }
+    } else {
+      for (final track in state.project.tracks) {
+        final index = track.clips.indexWhere((c) => c.id == clipId);
+        if (index != -1) {
+          final clip = track.clips[index];
+          final updated = clip.copyWith(
+            transition: transition,
+            clearTransition: transition == null,
+          );
+          final newClips = List<TimelineClip>.from(track.clips)..[index] = updated;
+          final updatedTrack = track.copyWith(clips: newClips);
+          state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+          return;
+        }
+      }
+    }
+  }
+
+  void setClipAdjustments(String clipId, ColorAdjustments adjustments) {
+    for (final track in state.project.tracks) {
+      final index = track.clips.indexWhere((c) => c.id == clipId);
+      if (index != -1) {
+        final clip = track.clips[index];
+        final updated = clip.copyWith(adjustments: adjustments);
+        final newClips = List<TimelineClip>.from(track.clips)..[index] = updated;
+        final updatedTrack = track.copyWith(clips: newClips);
+        state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+        return;
+      }
+    }
+  }
+
+  void setClipAnimation(String clipId, ClipAnimation? animation) {
+    _recordSnapshot();
+    for (final track in state.project.tracks) {
+      final index = track.clips.indexWhere((c) => c.id == clipId);
+      if (index != -1) {
+        final clip = track.clips[index];
+        final updated = clip.copyWith(animation: animation);
+        final newClips = List<TimelineClip>.from(track.clips)..[index] = updated;
+        final updatedTrack = track.copyWith(clips: newClips);
+        state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+        return;
+      }
     }
   }
 

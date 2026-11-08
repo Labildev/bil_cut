@@ -11,9 +11,12 @@ import '../../logic/player/video_playback_manager.dart';
 import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
+import '../widgets/editor/modals/animation_selector_sheet.dart';
+import '../widgets/editor/modals/filter_adjustment_sheet.dart';
 import '../widgets/editor/modals/format_selector_sheet.dart';
 import '../widgets/editor/modals/speed_control_sheet.dart';
 import '../widgets/editor/modals/text_editor_sheet.dart';
+import '../widgets/editor/modals/transition_selector_sheet.dart';
 import '../widgets/editor/modals/volume_control_sheet.dart';
 import '../widgets/editor/player_viewport.dart';
 import '../widgets/timeline/interactive_timeline.dart';
@@ -334,6 +337,61 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           onRatioSelected: (newRatio) => notifier.updateAspectRatio(newRatio),
         );
         break;
+      case EditorToolType.filters:
+      case EditorToolType.adjust:
+        final clip = ref.read(timelineNotifierProvider).selectedClip ??
+            ref.read(timelineNotifierProvider).project.mainVideoTrack?.clips.firstOrNull;
+        if (clip != null) {
+          FilterAdjustmentSheet.show(
+            context: context,
+            initialAdjustments: clip.adjustments,
+            onAdjustmentsChanged: (adj) => notifier.setClipAdjustments(clip.id, adj),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip video terlebih dahulu untuk filter & warna'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.animation:
+        final clip = ref.read(timelineNotifierProvider).selectedClip;
+        if (clip != null) {
+          AnimationSelectorSheet.show(
+            context: context,
+            initialAnimation: clip.animation,
+            onAnimationSelected: (anim) => notifier.setClipAnimation(clip.id, anim),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu untuk mengatur animasi'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.effects:
+        final clip = ref.read(timelineNotifierProvider).selectedClip ??
+            ref.read(timelineNotifierProvider).project.mainVideoTrack?.clips.firstOrNull;
+        if (clip != null) {
+          TransitionSelectorSheet.show(
+            context: context,
+            initialTransition: clip.transition,
+            onSave: (trans, applyAll) =>
+                notifier.setClipTransition(clip.id, trans, applyToAll: applyAll),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu untuk efek transisi'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -474,12 +532,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                           state.currentPosition <= c.timelineEnd)
                       .toList();
 
+                  final activeMainClip = state.project.mainVideoTrack?.clips
+                      .where((c) =>
+                          state.currentPosition >= c.timelineStart &&
+                          state.currentPosition <= c.timelineEnd)
+                      .firstOrNull;
+
                   return PlayerViewport(
                     aspectRatio: state.project.aspectRatio,
                     currentPosition: state.currentPosition,
                     totalDuration: state.totalDuration,
                     isPlaying: state.isPlaying,
                     videoController: controller,
+                    activeAdjustments: activeMainClip?.adjustments,
                     activeTextClips: textClips,
                     activeOverlayClips: overlayClips,
                     onPlayPauseToggle: () => notifier.togglePlayPause(),
