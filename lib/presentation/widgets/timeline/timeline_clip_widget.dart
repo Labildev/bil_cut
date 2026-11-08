@@ -159,6 +159,7 @@ class TimelineClipWidget extends StatelessWidget {
                         ),
                       if (clip.animation != null)
                         Container(
+                          margin: const EdgeInsets.only(right: 3),
                           padding:
                               const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                           decoration: BoxDecoration(
@@ -170,6 +171,23 @@ class TimelineClipWidget extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 7,
                               color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (clip.isReversed)
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E5FF),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            'REV',
+                            style: TextStyle(
+                              fontSize: 7,
+                              color: Colors.black,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

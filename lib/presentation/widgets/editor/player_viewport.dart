@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -16,6 +17,8 @@ class PlayerViewport extends StatelessWidget {
   final ColorAdjustments? activeAdjustments;
   final List<TimelineClip> activeTextClips;
   final List<TimelineClip> activeOverlayClips;
+  final int? canvasColor;
+  final double canvasBlur;
   final VoidCallback onPlayPauseToggle;
   final VoidCallback onFullscreenToggle;
   final VoidCallback onAspectRatioToggle;
@@ -30,6 +33,8 @@ class PlayerViewport extends StatelessWidget {
     this.activeAdjustments,
     this.activeTextClips = const [],
     this.activeOverlayClips = const [],
+    this.canvasColor,
+    this.canvasBlur = 0.0,
     required this.onPlayPauseToggle,
     required this.onFullscreenToggle,
     required this.onAspectRatioToggle,
@@ -75,7 +80,7 @@ class PlayerViewport extends StatelessWidget {
               aspectRatio: ratioValue,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF18181A),
+                  color: canvasColor != null ? Color(canvasColor!) : const Color(0xFF18181A),
                   border: Border.all(
                     color: AppColors.borderLight.withValues(alpha: 0.5),
                     width: 0.5,
@@ -85,6 +90,22 @@ class PlayerViewport extends StatelessWidget {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
+                      // 0. Blurred video background if canvas blur enabled
+                      if (hasActiveVideo && canvasBlur > 0)
+                        Positioned.fill(
+                          child: ImageFiltered(
+                            imageFilter: ui.ImageFilter.blur(sigmaX: canvasBlur, sigmaY: canvasBlur),
+                            child: FittedBox(
+                              fit: BoxFit.cover,
+                              child: SizedBox(
+                                width: videoController!.value.size.width,
+                                height: videoController!.value.size.height,
+                                child: VideoPlayer(videoController!),
+                              ),
+                            ),
+                          ),
+                        ),
+
                       // 1. Live VideoPlayer if initialized, otherwise sleek placeholder
                       if (hasActiveVideo)
                         SizedBox.expand(

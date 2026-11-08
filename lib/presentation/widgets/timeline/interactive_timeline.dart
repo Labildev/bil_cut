@@ -167,6 +167,7 @@ class _InteractiveTimelineState extends ConsumerState<InteractiveTimeline> {
                                     onTrimEnd: (clipId, newEnd) =>
                                         notifier.trimClipEnd(clipId, newEnd),
                                     onAddMedia: track.isMainTrack ? widget.onAddMedia : null,
+                                    onToggleMute: (trackId) => notifier.toggleTrackMute(trackId),
                                   );
                                 }),
 

@@ -14,6 +14,7 @@ class TimelineTrackWidget extends StatelessWidget {
   final void Function(String clipId, Duration newStart) onTrimStart;
   final void Function(String clipId, Duration newEnd) onTrimEnd;
   final VoidCallback? onAddMedia;
+  final ValueChanged<String>? onToggleMute;
 
   const TimelineTrackWidget({
     super.key,
@@ -25,6 +26,7 @@ class TimelineTrackWidget extends StatelessWidget {
     required this.onTrimStart,
     required this.onTrimEnd,
     this.onAddMedia,
+    this.onToggleMute,
   });
 
   IconData _getTrackIcon() {
@@ -52,20 +54,28 @@ class TimelineTrackWidget extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Track Header Badge (sticky on the left)
-          Container(
-            width: 32,
-            height: trackHeight,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Center(
-              child: Icon(
-                _getTrackIcon(),
-                size: 14,
-                color: track.isMuted ? AppColors.textMuted : AppColors.textSecondary,
+          // Track Header Badge (sticky on the left, tap to mute/unmute)
+          GestureDetector(
+            onTap: () => onToggleMute?.call(track.id),
+            child: Tooltip(
+              message: track.isMuted ? 'Buka suara track' : 'Bisukan track',
+              child: Container(
+                width: 32,
+                height: trackHeight,
+                decoration: BoxDecoration(
+                  color: track.isMuted ? const Color(0xFF2C1E1E) : AppColors.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: track.isMuted ? const Color(0xFFFF453A) : AppColors.border,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    track.isMuted ? LucideIcons.volumeX : _getTrackIcon(),
+                    size: 14,
+                    color: track.isMuted ? const Color(0xFFFF453A) : AppColors.textSecondary,
+                  ),
+                ),
               ),
             ),
           ),
