@@ -22,6 +22,31 @@ class MediaPickerService {
     }
   }
 
+  /// Records a video directly from device camera
+  Future<XFile?> captureVideoWithCamera() async {
+    try {
+      final file = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(minutes: 60),
+      );
+      return file;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Picks a single image from gallery (e.g. for photo overlay / sticker)
+  Future<XFile?> pickImage() async {
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
+      );
+      return file;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Picks multiple videos/media from device gallery
   Future<List<XFile>> pickMultipleVideos() async {
     try {
