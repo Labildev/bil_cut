@@ -5,6 +5,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ## 🎯 Target Arsitektur & Tech Stack
+
 - **Framework UI:** Flutter (Dart 3.x, Flutter 3.35+)
 - **State Management:** Riverpod (`flutter_riverpod`) untuk reaktivitas tinggi dan isolasi render timeline
 - **Design System:** CapCut Dark Aesthetic (`#121212`, `#1E1E1E`, Cyan Accent `#00F0FF`, Clean Typography)
@@ -95,6 +96,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ## 📋 Rincian Detail Setiap Fase
 
 ### 🔹 FASE 1: Fondasi Arsitektur, Design System & Shell UI
+
 * **Tujuan:** Membuat kerangka aplikasi yang kokoh, modular, dan memiliki tampilan visual yang 100% identik dengan nuansa CapCut.
 * **Komponen & Tugas:**
   1. Menambahkan dependensi utama (`flutter_riverpod`, `lucide_icons`, `google_fonts`, `path_provider`, dll.).
@@ -118,6 +120,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 2: Data Model & Custom Interactive Timeline Engine
+
 * **Tujuan:** Membangun inti interaksi video editor, yaitu *Timeline Canvas* multi-track yang presisi milidetik dan responsif.
 * **Komponen & Tugas:**
   1. Data Class:
@@ -134,6 +137,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 3: Media Import & Video Playback Integration
+
 * **Tujuan:** Mengintegrasikan pemutar video asli dan pemilihan media dari penyimpanan perangkat.
 * **Komponen & Tugas:**
   1. Integrasi picker media (`image_picker` / `file_picker` / `photo_manager`) dengan akses izin penyimpanan Android.
@@ -147,6 +151,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 4: Core Editing Engine (Tools Pemotong & Modifikasi)
+
 * **Tujuan:** Mengaktifkan seluruh fungsi manipulasi klip dasar.
 * **Komponen & Tugas:**
   1. **Split (Bagi):** Memotong klip yang dipilih tepat pada posisi playhead menjadi dua klip terpisah.
@@ -159,6 +164,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 5: Multi-Track Overlays (Teks, Audio BGM & PIP)
+
 * **Tujuan:** Mendukung editing multi-layer layaknya CapCut modern.
 * **Komponen & Tugas:**
   1. **Text Track & Editor:**
@@ -175,6 +181,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 6: Visual Effects, Filters & Transitions
+
 * **Tujuan:** Mempercantik video dengan sentuhan transisi dan penyesuaian visual.
 * **Komponen & Tugas:**
   1. **Transitions:**
@@ -187,6 +194,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 7: Video Export Engine (High-Performance Rendering)
+
 * **Tujuan:** Mengolah seluruh timeline menjadi satu file video MP4 utuh dengan kualitas tinggi.
 * **Komponen & Tugas:**
   1. Pembuatan command / pipeline rendering (Media3 Transformer / FFmpeg Kit) yang menggabungkan:
@@ -203,6 +211,7 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ### 🔹 FASE 8: Polish, Optimasi Performa & Rilis
+
 * **Tujuan:** Finalisasi aplikasi agar stabil, mulus, dan siap pakai.
 * **Komponen & Tugas:**
   1. Profiling performa memori dan CPU saat memproses video panjang.
@@ -214,7 +223,8 @@ Aplikasi editing video mobile berbasis **Flutter** (UI/UX) dan **Native Video En
 ---
 
 ## 🚦 Aturan Eksekusi
+
 Kita akan mengerjakan proyek ini **secara bertahap per fase**:
+
 1. Setiap fase akan diimplementasikan secara tuntas dan diuji.
 2. Setelah satu fase selesai, kita akan melakukan review dan verifikasi bersama Anda sebelum melangkah ke fase berikutnya.
-
