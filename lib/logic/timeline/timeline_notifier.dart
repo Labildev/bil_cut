@@ -4,12 +4,53 @@ import '../../data/models/timeline_project.dart';
 import 'timeline_state.dart';
 
 class TimelineNotifier extends StateNotifier<TimelineState> {
+  final List<TimelineProject> _undoStack = [];
+  final List<TimelineProject> _redoStack = [];
+  static const int _maxHistoryDepth = 50;
+
   TimelineNotifier([TimelineProject? initialProject])
       : super(
           TimelineState(
             project: initialProject ?? TimelineProject.sample(),
           ),
         );
+
+  void _recordSnapshot() {
+    _undoStack.add(state.project);
+    if (_undoStack.length > _maxHistoryDepth) {
+      _undoStack.removeAt(0);
+    }
+    _redoStack.clear();
+    state = state.copyWith(canUndo: true, canRedo: false);
+  }
+
+  void undo() {
+    if (_undoStack.isEmpty) return;
+
+    _redoStack.add(state.project);
+    final previousProject = _undoStack.removeLast();
+
+    state = state.copyWith(
+      project: previousProject,
+      canUndo: _undoStack.isNotEmpty,
+      canRedo: true,
+      clearSelectedClip: true,
+    );
+  }
+
+  void redo() {
+    if (_redoStack.isEmpty) return;
+
+    _undoStack.add(state.project);
+    final nextProject = _redoStack.removeLast();
+
+    state = state.copyWith(
+      project: nextProject,
+      canUndo: true,
+      canRedo: _redoStack.isNotEmpty,
+      clearSelectedClip: true,
+    );
+  }
 
   void seekTo(Duration position) {
     var targetPosition = position;
@@ -54,7 +95,6 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
   }
 
   void play() {
-    // If at end, loop to beginning
     if (state.currentPosition >= state.totalDuration) {
       state = state.copyWith(currentPosition: Duration.zero, isPlaying: true);
     } else {
@@ -68,7 +108,6 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
 
   void selectClip(String? clipId) {
     if (state.selectedClipId == clipId) {
-      // Toggle off selection if clicked again
       state = state.copyWith(clearSelectedClip: true);
     } else {
       state = state.copyWith(selectedClipId: clipId);
@@ -97,9 +136,10 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
     final splitResult = selectedClip.splitAt(splitPoint);
     if (splitResult == null) return false;
 
+    _recordSnapshot();
+
     final (leftClip, rightClip) = splitResult;
 
-    // Find the track containing this clip
     for (final track in state.project.tracks) {
       final clipIndex = track.clips.indexWhere((c) => c.id == selectedClip.id);
       if (clipIndex != -1) {
@@ -113,7 +153,7 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
 
         state = state.copyWith(
           project: updatedProject,
-          selectedClipId: rightClip.id, // Select the newly created right split clip
+          selectedClipId: rightClip.id,
         );
         return true;
       }
@@ -124,10 +164,15 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
   /// Trims start boundary of a clip
   void trimClipStart(String clipId, Duration newStart) {
     for (final track in state.project.tracks) {
-      final clip = track.clips.where((c) => c.id == clipId).firstOrNull;
-      if (clip != null) {
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        final clip = track.clips[clipIndex];
         final trimmed = clip.trimStart(newStart);
-        final updatedTrack = track.withUpdatedClip(trimmed);
+
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips[clipIndex] = trimmed;
+
+        final updatedTrack = track.copyWith(clips: newClips);
         state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
         return;
       }
@@ -137,25 +182,152 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
   /// Trims end boundary of a clip
   void trimClipEnd(String clipId, Duration newEnd) {
     for (final track in state.project.tracks) {
-      final clip = track.clips.where((c) => c.id == clipId).firstOrNull;
-      if (clip != null) {
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        final clip = track.clips[clipIndex];
         final trimmed = clip.trimEnd(newEnd);
-        final updatedTrack = track.withUpdatedClip(trimmed);
+
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips[clipIndex] = trimmed;
+
+        final updatedTrack = track.copyWith(clips: newClips);
         state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
         return;
       }
     }
   }
 
-  /// Deletes the currently selected clip
+  /// Sets clip playback speed and ripples subsequent clips on the track
+  bool setClipSpeed(String clipId, double newSpeed) {
+    if (newSpeed <= 0) return false;
+
+    for (final track in state.project.tracks) {
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        _recordSnapshot();
+
+        final clip = track.clips[clipIndex];
+        final updatedClip = clip.withSpeed(newSpeed);
+
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips[clipIndex] = updatedClip;
+
+        // Ripple adjust subsequent clips on main track
+        if (track.isMainTrack) {
+          _rippleRealignClips(newClips);
+        }
+
+        final updatedTrack = track.copyWith(clips: newClips);
+        state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Sets clip volume (0.0 to 2.0)
+  bool setClipVolume(String clipId, double volume) {
+    final clampedVolume = volume.clamp(0.0, 2.0);
+
+    for (final track in state.project.tracks) {
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        _recordSnapshot();
+
+        final clip = track.clips[clipIndex];
+        final updatedClip = clip.copyWith(volume: clampedVolume);
+
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips[clipIndex] = updatedClip;
+
+        final updatedTrack = track.copyWith(clips: newClips);
+        state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Duplicates the selected clip and inserts it immediately after
+  bool duplicateSelectedClip() {
+    final clipId = state.selectedClipId;
+    if (clipId == null) return false;
+
+    for (final track in state.project.tracks) {
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        _recordSnapshot();
+
+        final original = track.clips[clipIndex];
+        final duplicate = original.copyWith(
+          id: '${original.id}_dup_${DateTime.now().microsecondsSinceEpoch}',
+          name: '${original.name} (Salin)',
+          timelineStart: original.timelineEnd,
+        );
+
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips.insert(clipIndex + 1, duplicate);
+
+        if (track.isMainTrack) {
+          _rippleRealignClips(newClips);
+        }
+
+        final updatedTrack = track.copyWith(clips: newClips);
+        final updatedProject = state.project.withUpdatedTrack(updatedTrack);
+
+        state = state.copyWith(
+          project: updatedProject,
+          selectedClipId: duplicate.id,
+        );
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Rotates the selected clip 90 degrees clockwise
+  bool rotateSelectedClip() {
+    final clipId = state.selectedClipId;
+    if (clipId == null) return false;
+
+    for (final track in state.project.tracks) {
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        _recordSnapshot();
+
+        final clip = track.clips[clipIndex];
+        final rotated = clip.rotateClockwise();
+
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips[clipIndex] = rotated;
+
+        final updatedTrack = track.copyWith(clips: newClips);
+        state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Deletes the currently selected clip with ripple realignment on the main track
   bool deleteSelectedClip() {
     final clipId = state.selectedClipId;
     if (clipId == null) return false;
 
     for (final track in state.project.tracks) {
-      if (track.clips.any((c) => c.id == clipId)) {
-        final updatedTrack = track.withRemovedClip(clipId);
+      final clipIndex = track.clips.indexWhere((c) => c.id == clipId);
+      if (clipIndex != -1) {
+        _recordSnapshot();
+
+        final newClips = List<TimelineClip>.from(track.clips)..removeAt(clipIndex);
+
+        if (track.isMainTrack) {
+          _rippleRealignClips(newClips);
+        }
+
+        final updatedTrack = track.copyWith(clips: newClips);
         final updatedProject = state.project.withUpdatedTrack(updatedTrack);
+
         state = state.copyWith(
           project: updatedProject,
           clearSelectedClip: true,
@@ -166,24 +338,25 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
     return false;
   }
 
-  void updateAspectRatio(String ratio) {
-    state = state.copyWith(
-      project: state.project.copyWith(aspectRatio: ratio),
-    );
-  }
-
-  void updateResolution(String resolution) {
-    state = state.copyWith(
-      project: state.project.copyWith(resolution: resolution),
-    );
+  /// Re-aligns consecutive clips on the main track so there are no empty gaps
+  void _rippleRealignClips(List<TimelineClip> clips) {
+    var cursor = Duration.zero;
+    for (int i = 0; i < clips.length; i++) {
+      clips[i] = clips[i].copyWith(timelineStart: cursor);
+      cursor += clips[i].duration;
+    }
   }
 
   void loadProject(TimelineProject project) {
+    _undoStack.clear();
+    _redoStack.clear();
     state = state.copyWith(
       project: project,
       currentPosition: Duration.zero,
       isPlaying: false,
       clearSelectedClip: true,
+      canUndo: false,
+      canRedo: false,
     );
   }
 
@@ -192,6 +365,8 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
 
     final mainTrack = state.project.mainVideoTrack;
     if (mainTrack == null) return;
+
+    _recordSnapshot();
 
     var currentEnd = mainTrack.trackDuration;
     final positionedClips = <TimelineClip>[];
@@ -212,9 +387,24 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
     state = state.copyWith(project: updatedProject);
   }
 
+  void updateAspectRatio(String ratio) {
+    _recordSnapshot();
+    state = state.copyWith(
+      project: state.project.copyWith(aspectRatio: ratio),
+    );
+  }
+
+  void updateResolution(String resolution) {
+    _recordSnapshot();
+    state = state.copyWith(
+      project: state.project.copyWith(resolution: resolution),
+    );
+  }
+
   void toggleTrackMute(String trackId) {
     final track = state.project.tracks.where((t) => t.id == trackId).firstOrNull;
     if (track != null) {
+      _recordSnapshot();
       final updatedTrack = track.copyWith(isMuted: !track.isMuted);
       state = state.copyWith(
         project: state.project.withUpdatedTrack(updatedTrack),
@@ -227,4 +417,3 @@ final timelineNotifierProvider =
     StateNotifierProvider.autoDispose<TimelineNotifier, TimelineState>((ref) {
   return TimelineNotifier();
 });
-

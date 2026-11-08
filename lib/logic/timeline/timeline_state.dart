@@ -11,6 +11,8 @@ class TimelineState {
   final double pixelsPerSecond;
   final bool isSnappingEnabled;
   final bool isScrubbing;
+  final bool canUndo;
+  final bool canRedo;
 
   const TimelineState({
     required this.project,
@@ -20,6 +22,8 @@ class TimelineState {
     this.pixelsPerSecond = 60.0,
     this.isSnappingEnabled = true,
     this.isScrubbing = false,
+    this.canUndo = false,
+    this.canRedo = false,
   });
 
   Duration get totalDuration => project.totalDuration;
@@ -55,6 +59,8 @@ class TimelineState {
     double? pixelsPerSecond,
     bool? isSnappingEnabled,
     bool? isScrubbing,
+    bool? canUndo,
+    bool? canRedo,
   }) {
     return TimelineState(
       project: project ?? this.project,
@@ -64,7 +70,8 @@ class TimelineState {
       pixelsPerSecond: pixelsPerSecond ?? this.pixelsPerSecond,
       isSnappingEnabled: isSnappingEnabled ?? this.isSnappingEnabled,
       isScrubbing: isScrubbing ?? this.isScrubbing,
+      canUndo: canUndo ?? this.canUndo,
+      canRedo: canRedo ?? this.canRedo,
     );
   }
 }
-

@@ -27,6 +27,9 @@ class TimelineClip {
   
   /// Volume (0.0 = muted, 1.0 = 100%, 2.0 = 200% boost)
   final double volume;
+
+  /// Rotation in degrees (0, 90, 180, 270)
+  final int rotationDegrees;
   
   /// Visual properties (for text or overlay)
   final String? textContent;
@@ -44,6 +47,7 @@ class TimelineClip {
     required this.sourceOut,
     this.speed = 1.0,
     this.volume = 1.0,
+    this.rotationDegrees = 0,
     this.textContent,
     this.extraProperties,
   });
@@ -62,6 +66,7 @@ class TimelineClip {
     Duration? sourceOut,
     double? speed,
     double? volume,
+    int? rotationDegrees,
     String? textContent,
     Map<String, dynamic>? extraProperties,
   }) {
@@ -77,9 +82,15 @@ class TimelineClip {
       sourceOut: sourceOut ?? this.sourceOut,
       speed: speed ?? this.speed,
       volume: volume ?? this.volume,
+      rotationDegrees: rotationDegrees ?? this.rotationDegrees,
       textContent: textContent ?? this.textContent,
       extraProperties: extraProperties ?? this.extraProperties,
     );
+  }
+
+  /// Rotates the clip 90 degrees clockwise
+  TimelineClip rotateClockwise() {
+    return copyWith(rotationDegrees: (rotationDegrees + 90) % 360);
   }
 
   /// Splits this clip into two clips at [splitPointOnTimeline].
@@ -136,5 +147,15 @@ class TimelineClip {
       sourceOut: sourceIn + sourceDuration,
     );
   }
-}
 
+  /// Modifies clip speed and recalculates timeline duration
+  TimelineClip withSpeed(double newSpeed) {
+    if (newSpeed <= 0) return this;
+    final sourceSpan = sourceOut - sourceIn;
+    final newDurationMs = (sourceSpan.inMilliseconds / newSpeed).round();
+    return copyWith(
+      speed: newSpeed,
+      duration: Duration(milliseconds: newDurationMs),
+    );
+  }
+}
