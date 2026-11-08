@@ -10,6 +10,8 @@ import '../../logic/player/video_playback_manager.dart';
 import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
+import '../widgets/editor/modals/speed_control_sheet.dart';
+import '../widgets/editor/modals/volume_control_sheet.dart';
 import '../widgets/editor/player_viewport.dart';
 import '../widgets/timeline/interactive_timeline.dart';
 
@@ -155,6 +157,62 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           );
         }
         break;
+      case EditorToolType.speed:
+        final clip = ref.read(timelineNotifierProvider).selectedClip;
+        if (clip != null) {
+          SpeedControlSheet.show(
+            context: context,
+            clip: clip,
+            onSpeedChanged: (speed) => notifier.setClipSpeed(clip.id, speed),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu untuk mengatur kecepatan'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.volume:
+        final clip = ref.read(timelineNotifierProvider).selectedClip;
+        if (clip != null) {
+          VolumeControlSheet.show(
+            context: context,
+            clip: clip,
+            onVolumeChanged: (volume) => notifier.setClipVolume(clip.id, volume),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pilih klip terlebih dahulu untuk mengatur volume'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.duplicate:
+        final success = notifier.duplicateSelectedClip();
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Klip berhasil disalin'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
+      case EditorToolType.rotate:
+        final success = notifier.rotateSelectedClip();
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Klip diputar 90°'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        break;
       case EditorToolType.delete:
         final success = notifier.deleteSelectedClip();
         if (success) {
@@ -284,10 +342,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             // 1. Header Bar (Back, Undo/Redo, Resolution, Export)
             EditorHeader(
               onBack: () => Navigator.of(context).pop(),
-              onUndo: () {},
-              onRedo: () {},
-              canUndo: true,
-              canRedo: false,
+              onUndo: state.canUndo ? () => notifier.undo() : null,
+              onRedo: state.canRedo ? () => notifier.redo() : null,
+              canUndo: state.canUndo,
+              canRedo: state.canRedo,
               resolution: state.project.resolution,
               onResolutionChanged: (res) => notifier.updateResolution(res),
               onExport: _handleExport,
