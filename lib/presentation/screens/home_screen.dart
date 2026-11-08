@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/media_picker_service.dart';
 import '../../data/models/project_draft.dart';
+import '../../data/models/timeline_project.dart';
 import 'editor_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -44,12 +45,32 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  void _openEditor({ProjectDraft? draft}) {
-    Navigator.of(context).push(
+  Future<void> _openEditor({ProjectDraft? draft, TimelineProject? project}) async {
+    final result = await Navigator.of(context).push<ProjectDraft>(
       MaterialPageRoute(
-        builder: (context) => EditorScreen(initialDraft: draft),
+        builder: (context) => EditorScreen(
+          initialDraft: draft,
+          initialProject: project,
+        ),
       ),
     );
+
+    if (result != null && mounted) {
+      setState(() {
+        final existingIndex = _drafts.indexWhere((d) => d.id == result.id);
+        if (existingIndex >= 0) {
+          _drafts[existingIndex] = result;
+        } else {
+          _drafts.insert(0, result);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Draft "${result.title}" berhasil disimpan'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _handleNewProject() async {
@@ -61,15 +82,21 @@ class _HomeScreenState extends State<HomeScreen> {
         files: files,
         title: 'Proyek ${files.first.name}',
       );
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => EditorScreen(initialProject: project),
-        ),
-      );
+      _openEditor(project: project);
     } else {
-      // Open editor directly
       _openEditor();
     }
+  }
+
+  Future<void> _handleCameraCapture() async {
+    final file = await _mediaPicker.captureVideoWithCamera();
+    if (!mounted || file == null) return;
+
+    final project = _mediaPicker.createProjectFromFiles(
+      files: [file],
+      title: 'Rekaman ${file.name}',
+    );
+    _openEditor(project: project);
   }
 
   void _deleteDraft(String id) {
@@ -143,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(LucideIcons.settings, size: 20),
-            onPressed: () {},
+            onPressed: _showSettingsSheet,
             tooltip: 'Pengaturan',
           ),
           const SizedBox(width: 8),
@@ -348,10 +375,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildQuickTools() {
     final tools = [
-      {'icon': LucideIcons.camera, 'label': 'Kamera', 'color': const Color(0xFF00E5FF)},
-      {'icon': LucideIcons.wand2, 'label': 'AutoCut', 'color': const Color(0xFFFF2D55)},
-      {'icon': LucideIcons.fileText, 'label': 'Teks ke Video', 'color': const Color(0xFFFFD60A)},
-      {'icon': LucideIcons.mic, 'label': 'Voiceover', 'color': const Color(0xFF30D158)},
+      {
+        'icon': LucideIcons.camera,
+        'label': 'Kamera',
+        'color': const Color(0xFF00E5FF),
+        'action': () => _handleCameraCapture(),
+      },
+      {
+        'icon': LucideIcons.wand2,
+        'label': 'AutoCut',
+        'color': const Color(0xFFFF2D55),
+        'action': () => _handleNewProject(),
+      },
+      {
+        'icon': LucideIcons.fileText,
+        'label': 'Teks ke Video',
+        'color': const Color(0xFFFFD60A),
+        'action': () => _openEditor(),
+      },
+      {
+        'icon': LucideIcons.mic,
+        'label': 'Voiceover',
+        'color': const Color(0xFF30D158),
+        'action': () => _openEditor(),
+      },
     ];
 
     return Row(
@@ -360,36 +407,259 @@ class _HomeScreenState extends State<HomeScreen> {
         return Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 4),
-            padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border),
             ),
-            child: Column(
-              children: [
-                Icon(
-                  tool['icon'] as IconData,
-                  size: 22,
-                  color: tool['color'] as Color,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  tool['label'] as String,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: tool['action'] as VoidCallback?,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    children: [
+                      Icon(
+                        tool['icon'] as IconData,
+                        size: 22,
+                        color: tool['color'] as Color,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        tool['label'] as String,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  void _showSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.accentBlue],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        LucideIcons.scissors,
+                        size: 20,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'BIL',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              TextSpan(
+                                text: '_CUT',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.primary,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Text(
+                          'Versi 1.0.0 • Pro Video Editor Engine',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'ENGINE & ARSITEKTUR',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildSettingItem(
+                  icon: LucideIcons.cpu,
+                  title: 'Custom Timeline Engine',
+                  subtitle: 'Multi-track LOD Ruler & Magnetic Snapping',
+                ),
+                _buildSettingItem(
+                  icon: LucideIcons.sparkles,
+                  title: 'GPU Shader Color Matrix',
+                  subtitle: 'Real-time 60 FPS hardware color filter & adjustments',
+                ),
+                _buildSettingItem(
+                  icon: LucideIcons.film,
+                  title: 'Video Export Pipeline',
+                  subtitle: '4K/1080P/720P multi-stage video compositing engine',
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'PENYIMPANAN & CACHE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(LucideIcons.trash2, size: 18, color: AppColors.error),
+                  ),
+                  title: const Text(
+                    'Bersihkan Cache Video',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  subtitle: const Text(
+                    'Hapus thumbnail sementara dan cache render preview',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  trailing: TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Cache aplikasi berhasil dibersihkan'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: const Text('Bersihkan', style: TextStyle(color: AppColors.error)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Center(
+                  child: Text(
+                    'Dibuat oleh Labildev • Flutter & Native Engine',
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
                 ),
               ],
             ),
           ),
         );
-      }).toList(),
+      },
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Icon(icon, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

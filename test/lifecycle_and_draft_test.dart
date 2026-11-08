@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bil_cut/data/models/project_draft.dart';
-import 'package:bil_cut/data/models/timeline_project.dart';
 import 'package:bil_cut/logic/timeline/timeline_notifier.dart';
 import 'package:bil_cut/presentation/screens/editor_screen.dart';
 
