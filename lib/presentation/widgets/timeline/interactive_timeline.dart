@@ -48,8 +48,8 @@ class _InteractiveTimelineState extends ConsumerState<InteractiveTimeline> {
     if (!_isUserScrolling) return;
 
     final state = ref.read(timelineNotifierProvider);
-    final offset = _scrollController.offset;
-    final time = state.pixelsToTime(offset);
+    final offset = _scrollController.offset - 40.0;
+    final time = state.pixelsToTime(offset.clamp(0.0, double.infinity));
     ref.read(timelineNotifierProvider.notifier).seekTo(time);
   }
 
@@ -57,7 +57,7 @@ class _InteractiveTimelineState extends ConsumerState<InteractiveTimeline> {
     if (!_scrollController.hasClients || _isUserScrolling) return;
 
     final state = ref.read(timelineNotifierProvider);
-    final targetOffset = state.timeToPixels(state.currentPosition);
+    final targetOffset = state.timeToPixels(state.currentPosition) + 40.0;
     if ((_scrollController.offset - targetOffset).abs() > 1.0) {
       _scrollController.jumpTo(
         targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
@@ -135,18 +135,21 @@ class _InteractiveTimelineState extends ConsumerState<InteractiveTimeline> {
                           physics: const BouncingScrollPhysics(),
                           padding: EdgeInsets.symmetric(horizontal: centerPadding),
                           child: SizedBox(
-                            width: totalWidth,
+                            width: totalWidth + 40.0,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Time Ruler
-                                CustomTimeRuler(
-                                  pixelsPerSecond: state.pixelsPerSecond,
-                                  totalDuration: state.totalDuration,
-                                  onSeek: (target) {
-                                    notifier.seekTo(target);
-                                    _syncScrollToPosition();
-                                  },
+                                // Time Ruler aligned with tracks
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 40.0),
+                                  child: CustomTimeRuler(
+                                    pixelsPerSecond: state.pixelsPerSecond,
+                                    totalDuration: state.totalDuration,
+                                    onSeek: (target) {
+                                      notifier.seekTo(target);
+                                      _syncScrollToPosition();
+                                    },
+                                  ),
                                 ),
 
                                 const SizedBox(height: 6),

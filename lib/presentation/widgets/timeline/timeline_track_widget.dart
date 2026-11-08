@@ -47,7 +47,9 @@ class TimelineTrackWidget extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
+      width: totalWidth + 40.0,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Track Header Badge (sticky on the left)
