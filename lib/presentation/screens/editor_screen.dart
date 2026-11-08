@@ -5,12 +5,15 @@ import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/media_picker_service.dart';
 import '../../data/models/project_draft.dart';
+import '../../data/models/timeline_clip.dart';
 import '../../data/models/timeline_project.dart';
 import '../../logic/player/video_playback_manager.dart';
 import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
+import '../widgets/editor/modals/format_selector_sheet.dart';
 import '../widgets/editor/modals/speed_control_sheet.dart';
+import '../widgets/editor/modals/text_editor_sheet.dart';
 import '../widgets/editor/modals/volume_control_sheet.dart';
 import '../widgets/editor/player_viewport.dart';
 import '../widgets/timeline/interactive_timeline.dart';
@@ -113,6 +116,64 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _handlePickAudio(TimelineNotifier notifier) async {
+    final file = await _mediaPicker.pickVideo();
+    if (!mounted) return;
+
+    if (file != null) {
+      notifier.addAudioClip(
+        name: file.name,
+        path: file.path,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Audio "${file.name}" ditambahkan ke track musik'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      notifier.addAudioClip(
+        name: 'Chill_Lofi_Beat.mp3',
+        path: 'assets/audio/demo.mp3',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Audio BGM ditambahkan ke track musik'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handlePickOverlay(TimelineNotifier notifier) async {
+    final file = await _mediaPicker.pickVideo();
+    if (!mounted) return;
+
+    if (file != null) {
+      notifier.addOverlayClip(
+        name: file.name,
+        path: file.path,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Overlay PIP "${file.name}" ditambahkan'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      notifier.addOverlayClip(
+        name: 'PIP_Overlay_Demo.mp4',
+        path: '',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Overlay PIP ditambahkan di atas video'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   void _handleFullscreenToggle() {
@@ -224,14 +285,54 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           );
         }
         break;
+      case EditorToolType.text:
+        final selectedClip = ref.read(timelineNotifierProvider).selectedClip;
+        final isTextSelected = selectedClip != null && selectedClip.type == ClipType.text;
+
+        TextEditorSheet.show(
+          context: context,
+          initialClip: isTextSelected ? selectedClip : null,
+          onSave: ({
+            required String text,
+            required String font,
+            required int color,
+            required int? backgroundColor,
+            required bool hasShadow,
+          }) {
+            if (isTextSelected) {
+              notifier.updateTextClip(
+                clipId: selectedClip.id,
+                text: text,
+                font: font,
+                color: color,
+                backgroundColor: backgroundColor,
+                hasShadow: hasShadow,
+              );
+            } else {
+              notifier.addTextClip(
+                text: text,
+                font: font,
+                color: color,
+                backgroundColor: backgroundColor,
+                hasShadow: hasShadow,
+              );
+            }
+          },
+        );
+        break;
+      case EditorToolType.audio:
+        _handlePickAudio(notifier);
+        break;
+      case EditorToolType.overlay:
+        _handlePickOverlay(notifier);
+        break;
       case EditorToolType.format:
         final currentRatio = ref.read(timelineNotifierProvider).project.aspectRatio;
-        final nextRatio = currentRatio == '9:16'
-            ? '16:9'
-            : currentRatio == '16:9'
-                ? '1:1'
-                : '9:16';
-        notifier.updateAspectRatio(nextRatio);
+        FormatSelectorSheet.show(
+          context: context,
+          currentRatio: currentRatio,
+          onRatioSelected: (newRatio) => notifier.updateAspectRatio(newRatio),
+        );
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
@@ -357,21 +458,38 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               child: ValueListenableBuilder<VideoPlayerController?>(
                 valueListenable: _playbackManager.controllerNotifier,
                 builder: (context, controller, child) {
+                  final textClips = state.project.tracks
+                      .where((t) => t.type == ClipType.text && !t.isMuted)
+                      .expand((t) => t.clips)
+                      .where((c) =>
+                          state.currentPosition >= c.timelineStart &&
+                          state.currentPosition <= c.timelineEnd)
+                      .toList();
+
+                  final overlayClips = state.project.tracks
+                      .where((t) => t.type == ClipType.overlay && !t.isMuted)
+                      .expand((t) => t.clips)
+                      .where((c) =>
+                          state.currentPosition >= c.timelineStart &&
+                          state.currentPosition <= c.timelineEnd)
+                      .toList();
+
                   return PlayerViewport(
                     aspectRatio: state.project.aspectRatio,
                     currentPosition: state.currentPosition,
                     totalDuration: state.totalDuration,
                     isPlaying: state.isPlaying,
                     videoController: controller,
+                    activeTextClips: textClips,
+                    activeOverlayClips: overlayClips,
                     onPlayPauseToggle: () => notifier.togglePlayPause(),
                     onFullscreenToggle: _handleFullscreenToggle,
                     onAspectRatioToggle: () {
-                      final nextRatio = state.project.aspectRatio == '9:16'
-                          ? '16:9'
-                          : state.project.aspectRatio == '16:9'
-                              ? '1:1'
-                              : '9:16';
-                      notifier.updateAspectRatio(nextRatio);
+                      FormatSelectorSheet.show(
+                        context: context,
+                        currentRatio: state.project.aspectRatio,
+                        onRatioSelected: (newRatio) => notifier.updateAspectRatio(newRatio),
+                      );
                     },
                   );
                 },

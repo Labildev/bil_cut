@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/timeline_clip.dart';
 import '../../data/models/timeline_project.dart';
+import '../../data/models/timeline_track.dart';
 import 'timeline_state.dart';
 
 class TimelineNotifier extends StateNotifier<TimelineState> {
@@ -344,6 +345,182 @@ class TimelineNotifier extends StateNotifier<TimelineState> {
     for (int i = 0; i < clips.length; i++) {
       clips[i] = clips[i].copyWith(timelineStart: cursor);
       cursor += clips[i].duration;
+    }
+  }
+
+  void addTextClip({
+    required String text,
+    String font = 'Inter',
+    int color = 0xFFFFFFFF,
+    int? backgroundColor,
+    bool hasShadow = true,
+    Duration duration = const Duration(seconds: 4),
+  }) {
+    _recordSnapshot();
+
+    final textTrackIndex = state.project.tracks.indexWhere((t) => t.type == ClipType.text);
+    final clipId = 'text-${DateTime.now().microsecondsSinceEpoch}';
+    final startTime = state.currentPosition;
+
+    final newClip = TimelineClip(
+      id: clipId,
+      trackId: textTrackIndex != -1 ? state.project.tracks[textTrackIndex].id : 'track-text-overlay',
+      type: ClipType.text,
+      name: text,
+      textContent: text,
+      fontFamily: font,
+      textColorValue: color,
+      textBackgroundColorValue: backgroundColor,
+      hasTextShadow: hasShadow,
+      timelineStart: startTime,
+      duration: duration,
+      sourceOut: duration,
+    );
+
+    if (textTrackIndex != -1) {
+      final track = state.project.tracks[textTrackIndex];
+      final newClips = List<TimelineClip>.from(track.clips)..add(newClip);
+      final updatedTrack = track.copyWith(clips: newClips);
+      state = state.copyWith(
+        project: state.project.withUpdatedTrack(updatedTrack),
+        selectedClipId: newClip.id,
+      );
+    } else {
+      final newTrack = TimelineTrack(
+        id: 'track-text-overlay',
+        type: ClipType.text,
+        name: 'Teks',
+        clips: [newClip],
+      );
+      final newTracks = List<TimelineTrack>.from(state.project.tracks)..add(newTrack);
+      state = state.copyWith(
+        project: state.project.copyWith(tracks: newTracks),
+        selectedClipId: newClip.id,
+      );
+    }
+  }
+
+  void updateTextClip({
+    required String clipId,
+    required String text,
+    required String font,
+    required int color,
+    required int? backgroundColor,
+    required bool hasShadow,
+  }) {
+    for (final track in state.project.tracks) {
+      final index = track.clips.indexWhere((c) => c.id == clipId);
+      if (index != -1) {
+        _recordSnapshot();
+        final clip = track.clips[index];
+        final updated = clip.copyWith(
+          name: text,
+          textContent: text,
+          fontFamily: font,
+          textColorValue: color,
+          textBackgroundColorValue: backgroundColor,
+          hasTextShadow: hasShadow,
+        );
+        final newClips = List<TimelineClip>.from(track.clips);
+        newClips[index] = updated;
+        final updatedTrack = track.copyWith(clips: newClips);
+        state = state.copyWith(project: state.project.withUpdatedTrack(updatedTrack));
+        return;
+      }
+    }
+  }
+
+  void addAudioClip({
+    required String name,
+    required String path,
+    Duration duration = const Duration(seconds: 15),
+  }) {
+    _recordSnapshot();
+
+    final audioTrackIndex = state.project.tracks.indexWhere((t) => t.type == ClipType.audio);
+    final clipId = 'audio-${DateTime.now().microsecondsSinceEpoch}';
+    final startTime = state.currentPosition;
+
+    final newClip = TimelineClip(
+      id: clipId,
+      trackId: audioTrackIndex != -1 ? state.project.tracks[audioTrackIndex].id : 'track-audio-bgm',
+      type: ClipType.audio,
+      name: name,
+      sourcePath: path,
+      timelineStart: startTime,
+      duration: duration,
+      sourceOut: duration,
+      volume: 0.8,
+    );
+
+    if (audioTrackIndex != -1) {
+      final track = state.project.tracks[audioTrackIndex];
+      final newClips = List<TimelineClip>.from(track.clips)..add(newClip);
+      final updatedTrack = track.copyWith(clips: newClips);
+      state = state.copyWith(
+        project: state.project.withUpdatedTrack(updatedTrack),
+        selectedClipId: newClip.id,
+      );
+    } else {
+      final newTrack = TimelineTrack(
+        id: 'track-audio-bgm',
+        type: ClipType.audio,
+        name: 'Audio BGM',
+        clips: [newClip],
+      );
+      final newTracks = List<TimelineTrack>.from(state.project.tracks)..add(newTrack);
+      state = state.copyWith(
+        project: state.project.copyWith(tracks: newTracks),
+        selectedClipId: newClip.id,
+      );
+    }
+  }
+
+  void addOverlayClip({
+    required String name,
+    required String path,
+    Duration duration = const Duration(seconds: 5),
+  }) {
+    _recordSnapshot();
+
+    final overlayTrackIndex = state.project.tracks.indexWhere((t) => t.type == ClipType.overlay);
+    final clipId = 'overlay-${DateTime.now().microsecondsSinceEpoch}';
+    final startTime = state.currentPosition;
+
+    final newClip = TimelineClip(
+      id: clipId,
+      trackId: overlayTrackIndex != -1 ? state.project.tracks[overlayTrackIndex].id : 'track-pip-overlay',
+      type: ClipType.overlay,
+      name: name,
+      sourcePath: path,
+      timelineStart: startTime,
+      duration: duration,
+      sourceOut: duration,
+      scale: 0.8,
+      positionX: 0.5,
+      positionY: 0.5,
+    );
+
+    if (overlayTrackIndex != -1) {
+      final track = state.project.tracks[overlayTrackIndex];
+      final newClips = List<TimelineClip>.from(track.clips)..add(newClip);
+      final updatedTrack = track.copyWith(clips: newClips);
+      state = state.copyWith(
+        project: state.project.withUpdatedTrack(updatedTrack),
+        selectedClipId: newClip.id,
+      );
+    } else {
+      final newTrack = TimelineTrack(
+        id: 'track-pip-overlay',
+        type: ClipType.overlay,
+        name: 'Overlay PIP',
+        clips: [newClip],
+      );
+      final newTracks = List<TimelineTrack>.from(state.project.tracks)..add(newTrack);
+      state = state.copyWith(
+        project: state.project.copyWith(tracks: newTracks),
+        selectedClipId: newClip.id,
+      );
     }
   }
 
