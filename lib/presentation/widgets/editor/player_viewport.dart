@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:video_player/video_player.dart';
 import '../../../core/constants/app_colors.dart';
 
 class PlayerViewport extends StatelessWidget {
@@ -8,6 +9,7 @@ class PlayerViewport extends StatelessWidget {
   final Duration currentPosition;
   final Duration totalDuration;
   final bool isPlaying;
+  final VideoPlayerController? videoController;
   final VoidCallback onPlayPauseToggle;
   final VoidCallback onFullscreenToggle;
   final VoidCallback onAspectRatioToggle;
@@ -18,6 +20,7 @@ class PlayerViewport extends StatelessWidget {
     required this.currentPosition,
     required this.totalDuration,
     required this.isPlaying,
+    this.videoController,
     required this.onPlayPauseToggle,
     required this.onFullscreenToggle,
     required this.onAspectRatioToggle,
@@ -47,6 +50,8 @@ class PlayerViewport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ratioValue = _getAspectRatioValue();
+    final hasActiveVideo =
+        videoController != null && videoController!.value.isInitialized;
 
     return Container(
       color: AppColors.viewportBackground,
@@ -68,26 +73,38 @@ class PlayerViewport extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Placeholder visual grid / empty state
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          LucideIcons.clapperboard,
-                          size: 48,
-                          color: Colors.white.withValues(alpha: 0.15),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Preview Video',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.4),
-                            fontWeight: FontWeight.w500,
+                    // Live VideoPlayer if initialized, otherwise sleek placeholder
+                    if (hasActiveVideo)
+                      SizedBox.expand(
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: SizedBox(
+                            width: videoController!.value.size.width,
+                            height: videoController!.value.size.height,
+                            child: VideoPlayer(videoController!),
                           ),
                         ),
-                      ],
-                    ),
+                      )
+                    else
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            LucideIcons.clapperboard,
+                            size: 48,
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Preview Video',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
 
                     // Tap to play/pause hit area
                     Positioned.fill(
