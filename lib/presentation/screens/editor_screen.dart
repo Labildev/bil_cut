@@ -12,6 +12,7 @@ import '../../logic/timeline/timeline_notifier.dart';
 import '../widgets/editor/bottom_toolbar.dart';
 import '../widgets/editor/editor_header.dart';
 import '../widgets/editor/modals/animation_selector_sheet.dart';
+import '../widgets/editor/modals/export_settings_sheet.dart';
 import '../widgets/editor/modals/filter_adjustment_sheet.dart';
 import '../widgets/editor/modals/format_selector_sheet.dart';
 import '../widgets/editor/modals/speed_control_sheet.dart';
@@ -404,74 +405,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   void _handleExport() {
     final state = ref.read(timelineNotifierProvider);
-
-    showDialog(
+    ExportSettingsSheet.show(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.surfaceElevated,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.border),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.upload, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'Ekspor Video',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Video akan diekspor dengan pengaturan:',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              _buildExportInfoRow('Resolusi:', state.project.resolution),
-              _buildExportInfoRow('Rasio:', state.project.aspectRatio),
-              _buildExportInfoRow('Durasi:', '${state.totalDuration.inSeconds} detik'),
-              _buildExportInfoRow('FPS:', '${state.project.fps} fps'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Memulai render video... (Fase 7 Export Engine)'),
-                    backgroundColor: AppColors.surfaceLight,
-                  ),
-                );
-              },
-              child: const Text('Mulai Ekspor'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildExportInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-        ],
-      ),
+      project: state.project,
     );
   }
 

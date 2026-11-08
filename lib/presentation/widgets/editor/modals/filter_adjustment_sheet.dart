@@ -313,3 +313,4 @@ class _FilterAdjustmentSheetState extends State<FilterAdjustmentSheet>
     );
   }
 }
+
