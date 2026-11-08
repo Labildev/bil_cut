@@ -112,6 +112,72 @@ class TimelineClipWidget extends StatelessWidget {
                 ),
               ),
 
+              // Visual badge indicators (Transition / Filter / Animation)
+              if (clip.transition != null ||
+                  !clip.adjustments.isDefault ||
+                  clip.animation != null)
+                Positioned(
+                  left: isSelected ? 16 : 6,
+                  bottom: 4,
+                  child: Row(
+                    children: [
+                      if (clip.transition != null)
+                        Container(
+                          margin: const EdgeInsets.only(right: 3),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            '⧓',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (!clip.adjustments.isDefault)
+                        Container(
+                          margin: const EdgeInsets.only(right: 3),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9500),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            'FX',
+                            style: TextStyle(
+                              fontSize: 7,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (clip.animation != null)
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFBF5AF2),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            'ANIM',
+                            style: TextStyle(
+                              fontSize: 7,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
               // Left Trim Handle (Head)
               if (isSelected)
                 Positioned(

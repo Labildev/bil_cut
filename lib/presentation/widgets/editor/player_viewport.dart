@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../data/models/color_adjustments.dart';
 import '../../../data/models/timeline_clip.dart';
 
 class PlayerViewport extends StatelessWidget {
@@ -12,6 +13,7 @@ class PlayerViewport extends StatelessWidget {
   final Duration totalDuration;
   final bool isPlaying;
   final VideoPlayerController? videoController;
+  final ColorAdjustments? activeAdjustments;
   final List<TimelineClip> activeTextClips;
   final List<TimelineClip> activeOverlayClips;
   final VoidCallback onPlayPauseToggle;
@@ -25,6 +27,7 @@ class PlayerViewport extends StatelessWidget {
     required this.totalDuration,
     required this.isPlaying,
     this.videoController,
+    this.activeAdjustments,
     this.activeTextClips = const [],
     this.activeOverlayClips = const [],
     required this.onPlayPauseToggle,
@@ -90,7 +93,15 @@ class PlayerViewport extends StatelessWidget {
                             child: SizedBox(
                               width: videoController!.value.size.width,
                               height: videoController!.value.size.height,
-                              child: VideoPlayer(videoController!),
+                              child: activeAdjustments != null &&
+                                      !activeAdjustments!.isDefault
+                                  ? ColorFiltered(
+                                      colorFilter: ColorFilter.matrix(
+                                        activeAdjustments!.toColorFilterMatrix(),
+                                      ),
+                                      child: VideoPlayer(videoController!),
+                                    )
+                                  : VideoPlayer(videoController!),
                             ),
                           ),
                         )
