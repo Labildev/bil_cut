@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/constants/app_colors.dart';
@@ -36,7 +37,7 @@ class EditorScreen extends ConsumerStatefulWidget {
   ConsumerState<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorScreenState extends ConsumerState<EditorScreen> {
+class _EditorScreenState extends ConsumerState<EditorScreen> with WidgetsBindingObserver {
   late final VideoPlaybackManager _playbackManager;
   late final MediaPickerService _mediaPicker;
   Timer? _playbackTimer;
@@ -44,6 +45,13 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Lock to portrait orientation inside the editor screen
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
     _playbackManager = VideoPlaybackManager();
     _mediaPicker = MediaPickerService();
 
@@ -70,9 +78,30 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Reset orientations when exiting editor
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _playbackTimer?.cancel();
     _playbackManager.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // Pause playback and release decoder activity when app is minimized or interrupted
+      ref.read(timelineNotifierProvider.notifier).pause();
+      _playbackManager.syncWithTimeline(
+        timelinePosition: ref.read(timelineNotifierProvider).currentPosition,
+        project: ref.read(timelineNotifierProvider).project,
+        isPlaying: false,
+      );
+    }
   }
 
   void _startPlaybackTimer() {
@@ -403,6 +432,85 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     }
   }
 
+  Future<void> _handleBackNavigation() async {
+    // Pause playback before showing exit dialog
+    ref.read(timelineNotifierProvider.notifier).pause();
+    _playbackManager.syncWithTimeline(
+      timelinePosition: ref.read(timelineNotifierProvider).currentPosition,
+      project: ref.read(timelineNotifierProvider).project,
+      isPlaying: false,
+    );
+
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.save_rounded, color: AppColors.primary, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Simpan Proyek?',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Perubahan timeline dan track akan disimpan otomatis ke dalam draft proyek Anda.',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Keluar & Simpan',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true && mounted) {
+      final state = ref.read(timelineNotifierProvider);
+      final updatedDraft = ProjectDraft(
+        id: widget.initialDraft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}',
+        title: widget.initialDraft?.title ?? state.project.title,
+        duration: state.totalDuration,
+        updatedAt: DateTime.now(),
+        aspectRatio: state.project.aspectRatio,
+        clipCount: state.project.tracks.fold(0, (sum, t) => sum + t.clips.length),
+      );
+      Navigator.of(context).pop(updatedDraft);
+    }
+  }
+
   void _handleExport() {
     final state = ref.read(timelineNotifierProvider);
     ExportSettingsSheet.show(
@@ -429,22 +537,28 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       },
     );
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 1. Header Bar (Back, Undo/Redo, Resolution, Export)
-            EditorHeader(
-              onBack: () => Navigator.of(context).pop(),
-              onUndo: state.canUndo ? () => notifier.undo() : null,
-              onRedo: state.canRedo ? () => notifier.redo() : null,
-              canUndo: state.canUndo,
-              canRedo: state.canRedo,
-              resolution: state.project.resolution,
-              onResolutionChanged: (res) => notifier.updateResolution(res),
-              onExport: _handleExport,
-            ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // 1. Header Bar (Back, Undo/Redo, Resolution, Export)
+              EditorHeader(
+                onBack: _handleBackNavigation,
+                onUndo: state.canUndo ? () => notifier.undo() : null,
+                onRedo: state.canRedo ? () => notifier.redo() : null,
+                canUndo: state.canUndo,
+                canRedo: state.canRedo,
+                resolution: state.project.resolution,
+                onResolutionChanged: (res) => notifier.updateResolution(res),
+                onExport: _handleExport,
+              ),
 
             // 2. Video Player Preview Viewport (Live Video Player)
             Expanded(
@@ -513,6 +627,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
